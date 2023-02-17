@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	commonFlag "github.com/containers/common/pkg/flag"
 	"github.com/containers/common/pkg/retry"
 	"github.com/containers/image/v5/copy"
@@ -71,6 +72,7 @@ type tlsVerifyConfig struct {
 type registrySyncConfig struct {
 	Images           map[string][]string    // Images map images name to slices with the images' references (tags, digests)
 	ImagesByTagRegex map[string]string      `yaml:"images-by-tag-regex"` // Images map images name to regular expression with the images' tags
+	ImagesBySemver   map[string]string      `yaml:"images-by-semver"`    // ImagesBySemver maps name to a semver constraint (e.g. '>=3.14') to match images' tags to
 	Credentials      types.DockerAuthConfig // Username and password used to authenticate with the registry
 	TLSVerify        tlsVerifyConfig        `yaml:"tls-verify"` // TLS verification mode (enabled by default)
 	CertDir          string                 `yaml:"cert-dir"`   // Path to the TLS certificates of the registry
@@ -420,6 +422,64 @@ func imagesToCopyFromRegistry(registryName string, cfg registrySyncConfig, sourc
 		repoDescList = append(repoDescList, repoDescriptor{
 			ImageRefs: sourceReferences,
 			Context:   serverCtx})
+	}
+
+	// handle tags matching semver
+	for imageName, semverConstraint := range cfg.ImagesBySemver {
+		repoLogger := logrus.WithFields(logrus.Fields{
+			"repo":     imageName,
+			"registry": registryName,
+		})
+		repoRef, err := parseRepositoryReference(fmt.Sprintf("%s/%s", registryName, imageName))
+		if err != nil {
+			repoLogger.Error("Error parsing repository name, skipping")
+			logrus.Error(err)
+			continue
+		}
+		repoLogger.Info("Processing repo")
+
+		var sourceReferences []types.ImageReference
+
+		constraint, err := semver.NewConstraint(semverConstraint)
+		if err != nil {
+			repoLogger.Error("Error parsing semver constraint, skipping")
+			logrus.Error(err)
+			continue
+		}
+
+		repoLogger.Info("Querying registry for image tags")
+		allSourceReferences, err := imagesToCopyFromRepo(serverCtx, repoRef)
+		if err != nil {
+			repoLogger.Error("Error processing repo, skipping")
+			logrus.Error(err)
+			continue
+		}
+
+		repoLogger.Infof("Start filtering using the semantic version constraint: %q", semverConstraint)
+		for _, sReference := range allSourceReferences {
+			tagged, isTagged := sReference.DockerReference().(reference.Tagged)
+			if !isTagged {
+				repoLogger.Errorf("Internal error, reference %s does not have a tag, skipping", sReference.DockerReference())
+				continue
+			}
+			tagVersion, err := semver.NewVersion(tagged.Tag())
+			if err != nil {
+				repoLogger.Tracef("Tag %q cannot be parsed as semver, skipping", tagged.Tag())
+				continue
+			}
+			if constraint.Check(tagVersion) {
+				sourceReferences = append(sourceReferences, sReference)
+			}
+		}
+
+		if len(sourceReferences) == 0 {
+			repoLogger.Warnf("No refs to sync found")
+			continue
+		}
+		repoDescList = append(repoDescList, repoDescriptor{
+			ImageRefs: sourceReferences,
+			Context:   serverCtx})
+
 	}
 
 	return repoDescList, nil
