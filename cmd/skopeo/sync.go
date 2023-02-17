@@ -549,7 +549,7 @@ func imagesToCopy(source string, transport string, sourceCtx *types.SystemContex
 			return descriptors, err
 		}
 		for registryName, registryConfig := range cfg {
-			if len(registryConfig.Images) == 0 && len(registryConfig.ImagesByTagRegex) == 0 {
+			if len(registryConfig.Images) == 0 && len(registryConfig.ImagesByTagRegex) == 0 && len(registryConfig.ImagesBySemver) == 0 {
 				logrus.WithFields(logrus.Fields{
 					"registry": registryName,
 				}).Warn("No images specified for registry")
