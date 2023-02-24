@@ -306,6 +306,14 @@ func imagesToCopyFromRegistry(registryName string, cfg registrySyncConfig, sourc
 		serverCtx.DockerAuthConfig = &cfg.Credentials
 	}
 	var repoDescList []repoDescriptor
+
+	if len(cfg.Images) == 0 && len(cfg.ImagesByTagRegex) == 0 && len(cfg.ImagesBySemver) == 0 {
+		logrus.WithFields(logrus.Fields{
+			"registry": registryName,
+		}).Warn("No images specified for registry")
+		return repoDescList, nil
+	}
+
 	for imageName, refs := range cfg.Images {
 		repoLogger := logrus.WithFields(logrus.Fields{
 			"repo":     imageName,
@@ -486,7 +494,6 @@ func imagesToCopyFromRegistry(registryName string, cfg registrySyncConfig, sourc
 		repoDescList = append(repoDescList, repoDescriptor{
 			ImageRefs: sourceReferences,
 			Context:   serverCtx})
-
 	}
 
 	return repoDescList, nil
@@ -556,13 +563,6 @@ func imagesToCopy(source string, transport string, sourceCtx *types.SystemContex
 			return descriptors, err
 		}
 		for registryName, registryConfig := range cfg {
-			if len(registryConfig.Images) == 0 && len(registryConfig.ImagesByTagRegex) == 0 && len(registryConfig.ImagesBySemver) == 0 {
-				logrus.WithFields(logrus.Fields{
-					"registry": registryName,
-				}).Warn("No images specified for registry")
-				continue
-			}
-
 			descs, err := imagesToCopyFromRegistry(registryName, registryConfig, *sourceCtx)
 			if err != nil {
 				return descriptors, fmt.Errorf("Failed to retrieve list of images from registry %q: %w", registryName, err)
