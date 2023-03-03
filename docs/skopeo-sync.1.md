@@ -241,6 +241,14 @@ This will copy the following images:
 - Repository `quay.io/coreos/etcd`: images tagged "latest".
 - Repository `registry.example.com/alpine`: all images with tags satisfying either the "3.12 - 3.13" condition ("3.12.0", "3.12.1"...) or the ">= 3.17" ("3.17.5", "3.19.0", "4.0.0"...)
 
+The full list of possible semantic version comparisons can be found in the
+upstream library's documentation:
+https://github.com/Masterminds/semver/tree/v3.2.0#basic-comparisons.
+
+Version ordering and precedence is understood as defined here:
+https://semver.org/#spec-item-11.
+
+
 For the registry `registry.example.com`, the "john"/"this is a secret" credentials are used, with server TLS certificates located at `/home/john/certs`.
 
 TLS verification is normally enabled, and it can be disabled setting `tls-verify` to `false`.
