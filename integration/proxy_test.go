@@ -9,11 +9,14 @@ import (
 	"os/exec"
 	"strings"
 	"syscall"
+	"testing"
 	"time"
 
 	"github.com/containers/image/v5/manifest"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"gopkg.in/check.v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 // This image is known to be x86_64 only right now
@@ -213,17 +216,12 @@ func newProxy() (*proxy, error) {
 	return p, nil
 }
 
-func init() {
-	check.Suite(&ProxySuite{})
+func TestProxy(t *testing.T) {
+	suite.Run(t, &proxySuite{})
 }
 
-type ProxySuite struct {
-}
-
-func (s *ProxySuite) SetUpSuite(c *check.C) {
-}
-
-func (s *ProxySuite) TearDownSuite(c *check.C) {
+type proxySuite struct {
+	suite.Suite
 }
 
 type byteFetch struct {
@@ -232,7 +230,7 @@ type byteFetch struct {
 }
 
 func runTestGetManifestAndConfig(p *proxy, img string) error {
-	v, err := p.callNoFd("OpenImage", []any{knownNotManifestListedImageX8664})
+	v, err := p.callNoFd("OpenImage", []any{img})
 	if err != nil {
 		return err
 	}
@@ -247,7 +245,7 @@ func runTestGetManifestAndConfig(p *proxy, img string) error {
 	}
 
 	// Also verify the optional path
-	v, err = p.callNoFd("OpenImageOptional", []any{knownNotManifestListedImageX8664})
+	v, err = p.callNoFd("OpenImageOptional", []any{img})
 	if err != nil {
 		return err
 	}
@@ -334,25 +332,26 @@ func runTestOpenImageOptionalNotFound(p *proxy, img string) error {
 	return nil
 }
 
-func (s *ProxySuite) TestProxy(c *check.C) {
+func (s *proxySuite) TestProxy() {
+	t := s.T()
 	p, err := newProxy()
-	c.Assert(err, check.IsNil)
+	require.NoError(t, err)
 
 	err = runTestGetManifestAndConfig(p, knownNotManifestListedImageX8664)
 	if err != nil {
 		err = fmt.Errorf("Testing image %s: %v", knownNotManifestListedImageX8664, err)
 	}
-	c.Assert(err, check.IsNil)
+	assert.NoError(t, err)
 
 	err = runTestGetManifestAndConfig(p, knownListImage)
 	if err != nil {
 		err = fmt.Errorf("Testing image %s: %v", knownListImage, err)
 	}
-	c.Assert(err, check.IsNil)
+	assert.NoError(t, err)
 
 	err = runTestOpenImageOptionalNotFound(p, knownNotExtantImage)
 	if err != nil {
 		err = fmt.Errorf("Testing optional image %s: %v", knownNotExtantImage, err)
 	}
-	c.Assert(err, check.IsNil)
+	assert.NoError(t, err)
 }
