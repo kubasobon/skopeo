@@ -384,7 +384,7 @@ func imagesToCopyFromRegistry(registryName string, cfg registrySyncConfig, sourc
 		if err != nil {
 			logrus.Error(err)
 		} else {
-			additionalRepoDescList := filteredSourceReferences(serverCtx, registryName, filterCollection)
+			additionalRepoDescList := filterSourceReferences(serverCtx, registryName, filterCollection)
 			repoDescList = append(repoDescList, additionalRepoDescList...)
 		}
 	}
@@ -395,7 +395,7 @@ func imagesToCopyFromRegistry(registryName string, cfg registrySyncConfig, sourc
 		if err != nil {
 			logrus.Error(err)
 		} else {
-			additionalRepoDescList := filteredSourceReferences(serverCtx, registryName, filterCollection)
+			additionalRepoDescList := filterSourceReferences(serverCtx, registryName, filterCollection)
 			repoDescList = append(repoDescList, additionalRepoDescList...)
 		}
 	}
@@ -403,10 +403,17 @@ func imagesToCopyFromRegistry(registryName string, cfg registrySyncConfig, sourc
 	return repoDescList, nil
 }
 
+// filterFunc is a function used to limit the initial set of image references
+// using tags, patterns, semver, etc.
 type filterFunc func(*logrus.Entry, []types.ImageReference) []types.ImageReference
+
+// filterCollection is a map of image names to filter functions.
 type filterCollection map[string]filterFunc
 
-func filteredSourceReferences(sys *types.SystemContext, registryName string, collection filterCollection) []repoDescriptor {
+// filterSourceReferences lists tags for images specified in the collection and
+// filters them using assigned filter functions.
+// It returns a list of repoDescriptors.
+func filterSourceReferences(sys *types.SystemContext, registryName string, collection filterCollection) []repoDescriptor {
 	var repoDescList []repoDescriptor
 	for imageName, filter := range collection {
 		logger := logrus.WithFields(logrus.Fields{
@@ -446,6 +453,9 @@ func filteredSourceReferences(sys *types.SystemContext, registryName string, col
 	return repoDescList
 }
 
+// tagRegexFilterCollection converts a map of (image name, tag regex) pairs
+// into a filterCollection, which is a map of (image name, filter function)
+// pairs.
 func tagRegexFilterCollection(collection map[string]string) (filterCollection, error) {
 	filters := filterCollection{}
 
@@ -476,6 +486,9 @@ func tagRegexFilterCollection(collection map[string]string) (filterCollection, e
 	return filters, nil
 }
 
+// semverFilterCollection converts a map of (image name, array of semver constraints) pairs
+// into a filterCollection, which is a map of (image name, filter function)
+// pairs.
 func semverFilterCollection(collection map[string][]string) (filterCollection, error) {
 	filters := filterCollection{}
 
